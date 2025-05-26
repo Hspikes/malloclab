@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
-
+#include<math.h>
 #include "mm.h"
 #include "memlib.h"
 
@@ -57,8 +57,6 @@ team_t team = {
 
 #define PAGE_SIZE (1 << 12)
 
-void *ListHead = NULL,*ListTail = NULL;
-
 #define BLOCK_SIZE(PTR) (unsigned int)(GET_SIZE(HEAD_PTR(PTR)))
 #define IS_BLOCK_ALLOC(PTR) (IS_ALLOC(HEAD_PTR(PTR)))
 
@@ -69,43 +67,49 @@ void *ListHead = NULL,*ListTail = NULL;
 #define READ_PTR(PTR) (size_t)(*((size_t*)(PTR)))
 #define WRITE_PTR(PTR,VALUE) ((*(size_t *)(PTR)) = (size_t)(VALUE))
 
-void insert(void *ptr)
+
+#define LIST_NUM 33
+void *ListHead[LIST_NUM],*ListTail[LIST_NUM];
+
+void insert(void *ptr,unsigned size)
 {
     // printf("Insert: %p\n",ptr);
-    if(!ListHead)
+    int k=log2(size)-1;
+    if(!ListHead[k])
     {
-        ListHead=ptr;
-        ListTail=ptr;
+        ListHead[k]=ptr;
+        ListTail[k]=ptr;
         WRITE_PTR(ptr,NULL);
         WRITE_PTR(NEXT_PTR(ptr),NULL);
     }
     else
     {
-        WRITE_PTR(ptr,ListTail);
-        WRITE_PTR(NEXT_PTR(ListTail),ptr);
+        WRITE_PTR(ptr,ListTail[k]);
+        WRITE_PTR(NEXT_PTR(ListTail[k]),ptr);
         WRITE_PTR(NEXT_PTR(ptr),NULL);
-        ListTail = ptr;
+        ListTail[k] = ptr;
     }
     return;
 
 }
 
-void delete(void *ptr)
+void delete(void *ptr,unsigned size)
 {
     // printf("Delete: %p\n",ptr);
     void *pre_p, *nxt_p;
     pre_p = PREV_LIST(ptr);
     nxt_p = NEXT_LIST(ptr);
+    int k=log2(size)-1;
     if(!pre_p && !nxt_p)
-        ListHead=ListTail=NULL;
+        ListHead[k]=ListTail[k]=NULL;
     else if(!pre_p)
     {
-        ListHead=nxt_p;
+        ListHead[k]=nxt_p;
         WRITE_PTR(nxt_p,NULL);
     }
     else if(!nxt_p)
     {
-        ListTail=pre_p;
+        ListTail[k]=pre_p;
         WRITE_PTR(NEXT_PTR(pre_p),NULL);
     }
     else
@@ -122,25 +126,25 @@ void *Merge(void *Ptr) {
     unsigned size=BLOCK_SIZE(Ptr);
     if(!IS_BLOCK_ALLOC(nxt_b))
     {
-        delete(nxt_b);
+        delete(nxt_b,BLOCK_SIZE(nxt_b));
         size+=BLOCK_SIZE(nxt_b);
     }
     if(!IS_BLOCK_ALLOC(pre_b))
     {
-        delete(pre_b);
+        delete(pre_b,BLOCK_SIZE(pre_b));
         size+=BLOCK_SIZE(pre_b);
         Ptr=pre_b;
     }
     WRITE(HEAD_PTR(Ptr),PACK(size,0));
     WRITE(TAIL_PTR(Ptr),PACK(size,0));
     // printf("Merge Block: %p, Size = %d\n",Ptr,size);
-    insert(Ptr);
+    insert(Ptr,size);
     return Ptr;
 }
 
 void Place(void *Ptr, unsigned Size) {
     unsigned size=BLOCK_SIZE(Ptr);
-    delete(Ptr);
+    delete(Ptr,size);
     if(size-Size<=24)
     {
         WRITE(HEAD_PTR(Ptr),PACK(size,1));
@@ -154,7 +158,7 @@ void Place(void *Ptr, unsigned Size) {
         Ptr=NEXT_BLOCK(Ptr);
         size=size-Size;
         // printf("Remain Block: %p, Size = %u\n",Ptr,size);
-        insert(Ptr);
+        insert(Ptr,size);
         WRITE(HEAD_PTR(Ptr),PACK(size,0));
         WRITE(TAIL_PTR(Ptr),PACK(size,0));
     }
@@ -162,7 +166,8 @@ void Place(void *Ptr, unsigned Size) {
 }
 
 void *FirstFit(size_t Size) {
-    void *ptr=ListHead;
+    int k=log2(Size)-1;
+    void *ptr=ListHead[k];
     while(ptr)
     {
         if(BLOCK_SIZE(ptr)>=Size) return ptr;
@@ -173,7 +178,8 @@ void *FirstFit(size_t Size) {
 
 int mm_init() {
     void * HeapList = mem_sbrk(WORD_SIZE << 2);
-    ListHead=ListTail=NULL;
+    for(int i=0;i<LIST_NUM;++i)
+        ListHead[i]=ListTail[i]=NULL;
     if (HeapList == (void *)-1) return -1;
     WRITE(HeapList, 0);
     WRITE(HeapList + WORD_SIZE * 1, PACK(8, 1));

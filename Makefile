@@ -10,9 +10,9 @@ CC = gcc
 CFLAGS = -Wall -g -m32
 
 OBJS = mdriver.o mm.o memlib.o fsecs.o fcyc.o clock.o ftimer.o
-
+LDFLAGS = -lm
 mdriver: $(OBJS)
-	$(CC) $(CFLAGS) -o mdriver $(OBJS)
+	$(CC) $(CFLAGS) -o mdriver $(OBJS) $(LDFLAGS)
 
 mdriver.o: mdriver.c fsecs.h fcyc.h clock.h memlib.h config.h mm.h
 memlib.o: memlib.c memlib.h
