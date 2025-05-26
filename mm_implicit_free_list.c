@@ -26,9 +26,9 @@ team_t team = {
     /* Team name */
     "XJTU ICS",
     /* First member's full name */
-    "Your name please",
+    "Hspike",
     /* First member's email address */
-    "Your email address please",
+    "hspike@666",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
@@ -44,10 +44,12 @@ team_t team = {
 
 #define PACK(SIZE, IS_ALLOC) ((SIZE) | (IS_ALLOC))
 
+#define HEAD_PTR(PTR) ((void *)(PTR) - WORD_SIZE)
+
 #define GET_SIZE(PTR) (unsigned int)((READ(PTR) >> 3) << 3)
 #define IS_ALLOC(PTR) (READ(PTR) & (unsigned int)1)
 
-#define HEAD_PTR(PTR) ((void *)(PTR) - WORD_SIZE)
+
 #define TAIL_PTR(PTR) ((void *)(PTR) + GET_SIZE(HEAD_PTR(PTR)) - WORD_SIZE * 2)
 
 #define NEXT_BLOCK(PTR) ((void *)(PTR) + GET_SIZE(HEAD_PTR(PTR)))
@@ -57,16 +59,54 @@ team_t team = {
 
 void *HeapList = NULL;
 
+#define BLOCK_SIZE(PTR) (GET_SIZE(HEAD_PTR(PTR)))
+#define IS_BLOCK_ALLOC(PTR) (IS_ALLOC(HEAD_PTR(PTR)))
+
 void *Merge(void *Ptr) {
-    // Do what you like here
+    void * nxt_b=NEXT_BLOCK(Ptr);
+    void * pre_b=PREV_BLOCK(Ptr);
+
+    unsigned size=BLOCK_SIZE(Ptr);
+    if(!IS_BLOCK_ALLOC(nxt_b))
+        size+=BLOCK_SIZE(nxt_b);
+    if(!IS_BLOCK_ALLOC(pre_b))
+    {
+        size+=BLOCK_SIZE(pre_b);
+        Ptr=pre_b;
+    }
+    WRITE(HEAD_PTR(Ptr),PACK(size,0));
+    WRITE(TAIL_PTR(Ptr),PACK(size,0));
+    return Ptr;
 }
 
-void Place(void *Ptr, unsigned int Size) {
+void Place(void *Ptr, unsigned Size) {
     // Do what you like here
+    unsigned size=BLOCK_SIZE(Ptr);
+    if(size-Size==sizeof(size_t))
+    {
+        WRITE(HEAD_PTR(Ptr),PACK(size,1));
+        WRITE(TAIL_PTR(Ptr),PACK(size,1));
+    }
+    else 
+    {
+        WRITE(HEAD_PTR(Ptr),PACK(Size,1));
+        WRITE(TAIL_PTR(Ptr),PACK(Size,1));
+        Ptr=NEXT_BLOCK(Ptr);
+        size=size-Size;
+        WRITE(HEAD_PTR(Ptr),PACK(size,0));
+        WRITE(TAIL_PTR(Ptr),PACK(size,0));
+    }
+    return;
 }
 
 void *FirstFit(size_t Size) {
-    // Do what you like here
+    void * ptr=HeapList;
+    while(BLOCK_SIZE(ptr))
+    {
+        if((!IS_BLOCK_ALLOC(ptr)) && BLOCK_SIZE(ptr)>=Size) return ptr;
+        else ptr=NEXT_BLOCK(ptr); 
+    }
+    return NULL;
 }
 
 int mm_init() {
@@ -80,6 +120,7 @@ int mm_init() {
     WRITE(HeapList + WORD_SIZE * 2, PACK(8, 1));
     // Epilogue block
     WRITE(HeapList + WORD_SIZE * 3, PACK(0, 1));
+    HeapList+=WORD_SIZE*2;
     return 0;
 }
 
