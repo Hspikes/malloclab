@@ -102,11 +102,11 @@ void Place(void *Ptr, unsigned Size) {
 }
 
 void *FirstFit(size_t Size) {
-    void * ptr=HeapList;
+    void *ptr=HeapList;
     while(BLOCK_SIZE(ptr))
     {
         if((!IS_BLOCK_ALLOC(ptr)) && BLOCK_SIZE(ptr)>=Size) return ptr;
-        else ptr=NEXT_BLOCK(ptr); 
+        else ptr=NEXT_BLOCK(ptr);
     }
     return NULL;
 }
@@ -166,6 +166,7 @@ void *mm_realloc(void *ptr, size_t size) {
     mm_free(ptr);
     return NewPtr;
 }
+
 
 /*
 static void mm_printblock(void * ptr) {
