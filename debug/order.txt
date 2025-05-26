@@ -1,0 +1,3 @@
+./mdriver -V -t ./traces/
+
+./mdriver -V -f ./traces/amptjp-bal.rep

@@ -59,7 +59,7 @@ team_t team = {
 
 void *HeapList = NULL;
 
-#define BLOCK_SIZE(PTR) (GET_SIZE(HEAD_PTR(PTR)))
+#define BLOCK_SIZE(PTR) (unsigned int)(GET_SIZE(HEAD_PTR(PTR)))
 #define IS_BLOCK_ALLOC(PTR) (IS_ALLOC(HEAD_PTR(PTR)))
 
 void *Merge(void *Ptr) {
@@ -76,13 +76,13 @@ void *Merge(void *Ptr) {
     }
     WRITE(HEAD_PTR(Ptr),PACK(size,0));
     WRITE(TAIL_PTR(Ptr),PACK(size,0));
+    // printf("Merge Block: %p, Size = %d\n",Ptr,size);
     return Ptr;
 }
 
 void Place(void *Ptr, unsigned Size) {
-    // Do what you like here
     unsigned size=BLOCK_SIZE(Ptr);
-    if(size-Size==sizeof(size_t))
+    if(size-Size<=sizeof(size_t))
     {
         WRITE(HEAD_PTR(Ptr),PACK(size,1));
         WRITE(TAIL_PTR(Ptr),PACK(size,1));
@@ -91,8 +91,10 @@ void Place(void *Ptr, unsigned Size) {
     {
         WRITE(HEAD_PTR(Ptr),PACK(Size,1));
         WRITE(TAIL_PTR(Ptr),PACK(Size,1));
+        // printf("Place Block: %p, Size = %u\n",Ptr,Size);
         Ptr=NEXT_BLOCK(Ptr);
         size=size-Size;
+        // printf("Remain Block: %p, Size = %u\n",Ptr,size);
         WRITE(HEAD_PTR(Ptr),PACK(size,0));
         WRITE(TAIL_PTR(Ptr),PACK(size,0));
     }
@@ -110,73 +112,65 @@ void *FirstFit(size_t Size) {
 }
 
 int mm_init() {
-    // Request for 16 bytes space
     HeapList = mem_sbrk(WORD_SIZE << 2);
     if (HeapList == (void *)-1) return -1;
-    // Fill in metadata as initial space
     WRITE(HeapList, 0);
     // Prologue block
     WRITE(HeapList + WORD_SIZE * 1, PACK(8, 1));
     WRITE(HeapList + WORD_SIZE * 2, PACK(8, 1));
-    // Epilogue block
     WRITE(HeapList + WORD_SIZE * 3, PACK(0, 1));
-    HeapList+=WORD_SIZE*2;
+    HeapList+=WORD_SIZE * 2;
+    // printf("\nHeapList = %p\n",HeapList);
     return 0;
 }
 
 void *mm_malloc(size_t size) {
-    // If size equals zero, which means we don't need to execute malloc
+    // printf("\n");
     if (size == 0) return NULL;
-    // Add header size and tailer size to block size
     size += (WORD_SIZE << 1);
-    // Round up size to mutiple of 8
     if ((size & (unsigned int)7) > 0) size += (1 << 3) - (size & 7);
-    // We call first fit function to find a space with size greater than argument 'size'
     void *Ptr = FirstFit(size);
-    // If first fit function return NULL, which means there's no suitable space.
-    // Else we find it. The all things to do is to place it.
     if (Ptr != NULL) {
         Place(Ptr, size);
+        // printf("Block Malloc: %p, Size = %u\n",Ptr,size);
         return Ptr;
     }
-    // We call sbrk to extend heap size
     unsigned int SbrkSize = MAX(size, PAGE_SIZE);
     void *NewPtr = mem_sbrk(SbrkSize);
     if (NewPtr == (void *)-1) return NULL;
-    // Write metadata in newly requested space
     WRITE(NewPtr - WORD_SIZE, PACK(SbrkSize, 0));
     WRITE(mem_heap_hi() - 3 - WORD_SIZE, PACK(SbrkSize, 0));
     WRITE(mem_heap_hi() - 3, PACK(0, 1));
-    // Execute function merge to merge new space and free block in front of it
     NewPtr = Merge(NewPtr);
-    // Execute function place to split the free block to 1/2 parts
     Place(NewPtr, size);
+    // printf("New Malloc: %p, Size = %u\n",NewPtr,size);
     return NewPtr;
 }
 
 void mm_free(void *ptr) {
-    // We just fill in the header and tailer with PACK(Size, 0)
     void *Header = HEAD_PTR(ptr), *Tail = TAIL_PTR(ptr);
+    // printf("Free: %p\n",ptr);
     unsigned int Size = GET_SIZE(Header);
     WRITE(Header, PACK(Size, 0));
     WRITE(Tail, PACK(Size, 0));
-    // Then merge it with adjacent free blocks
     Merge(ptr);
 }
 
 void *mm_realloc(void *ptr, size_t size) {
-    // We get block's original size
     unsigned int BlkSize = GET_SIZE(HEAD_PTR(ptr));
-    // Round up size to mutiple of 8
     if ((size & (unsigned int)7) > 0) size += (1 << 3) - (size & 7);
-    // If original size is greater than requested size, we don't do any.
     if (BlkSize >= size + WORD_SIZE * 2) return ptr;
-    // Else, we call malloc to get a new space for it.
     void *NewPtr = mm_malloc(size);
     if (NewPtr == NULL) return NULL;
-    // Move the data to new space
     memmove(NewPtr, ptr, size);
-    // Free old block
     mm_free(ptr);
     return NewPtr;
 }
+
+/*
+static void mm_printblock(void * ptr) {
+    printf("address = %p\n",ptr);
+    printf("size = %d\n",BLOCK_SIZE(ptr));
+    // printf("%d\n")
+}
+*/
