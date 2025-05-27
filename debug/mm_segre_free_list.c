@@ -66,7 +66,6 @@ team_t team = {
 
 #define READ_PTR(PTR) (size_t)(*((size_t*)(PTR)))
 #define WRITE_PTR(PTR,VALUE) ((*(size_t *)(PTR)) = (size_t)(VALUE))
-// #define ListHead(k) 
 
 #define LIST_NUM 32
 void *ListHead[LIST_NUM],*ListTail[LIST_NUM];
@@ -143,41 +142,27 @@ void *Merge(void *Ptr) {
     return Ptr;
 }
 
-void * Place(void *Ptr, unsigned Size) {
+void Place(void *Ptr, unsigned Size) {
     unsigned size=BLOCK_SIZE(Ptr);
     delete(Ptr,size);
     if(size-Size<=24)
     {
         WRITE(HEAD_PTR(Ptr),PACK(size,1));
         WRITE(TAIL_PTR(Ptr),PACK(size,1));
-        return Ptr;
     }
-    else if(Size<=64)
+    else 
     {
         WRITE(HEAD_PTR(Ptr),PACK(Size,1));
         WRITE(TAIL_PTR(Ptr),PACK(Size,1));
         // printf("Place Block: %p, Size = %u\n",Ptr,Size);
-        void * rePtr=Ptr;
         Ptr=NEXT_BLOCK(Ptr);
         size=size-Size;
         // printf("Remain Block: %p, Size = %u\n",Ptr,size);
         insert(Ptr,size);
         WRITE(HEAD_PTR(Ptr),PACK(size,0));
         WRITE(TAIL_PTR(Ptr),PACK(size,0));
-        return rePtr;
     }
-    else
-    {
-        size=size-Size;
-        WRITE(HEAD_PTR(Ptr),PACK(size,0));
-        WRITE(TAIL_PTR(Ptr),PACK(size,0));
-        insert(Ptr,size);
-        Ptr=NEXT_BLOCK(Ptr);
-        WRITE(HEAD_PTR(Ptr),PACK(Size,1));
-        WRITE(TAIL_PTR(Ptr),PACK(Size,1));
-        return Ptr;        
-    }
-    // return;
+    return;
 }
 
 void *FirstFit(size_t Size) {
@@ -216,7 +201,7 @@ void *mm_malloc(size_t size) {
     if ((size & (unsigned int)7) > 0) size += (1 << 3) - (size & 7);
     void *Ptr = FirstFit(size);
     if (Ptr != NULL) {
-        Ptr=Place(Ptr, size);
+        Place(Ptr, size);
         // printf("Block Malloc: %p, Size = %u\n",Ptr,size);
         return Ptr;
     }
@@ -228,7 +213,7 @@ void *mm_malloc(size_t size) {
     WRITE(mem_heap_hi() - 3, PACK(0, 1));
     NewPtr = Merge(NewPtr);
     // insert(NewPtr);
-    NewPtr=Place(NewPtr, size);
+    Place(NewPtr, size);
     // printf("New Malloc: %p, Size = %u\n",NewPtr,size);
     return NewPtr;
 }
