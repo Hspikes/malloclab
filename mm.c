@@ -66,15 +66,16 @@ team_t team = {
 
 #define READ_PTR(PTR) (size_t)(*((size_t*)(PTR)))
 #define WRITE_PTR(PTR,VALUE) ((*(size_t *)(PTR)) = (size_t)(VALUE))
+#define ListHead(k) 
 
-
-#define LIST_NUM 33
+#define LIST_NUM 32
 void *ListHead[LIST_NUM],*ListTail[LIST_NUM];
 
 void insert(void *ptr,unsigned size)
 {
     // printf("Insert: %p\n",ptr);
     int k=log2(size)-1;
+    // int k=0;
     if(!ListHead[k])
     {
         ListHead[k]=ptr;
@@ -167,11 +168,14 @@ void Place(void *Ptr, unsigned Size) {
 
 void *FirstFit(size_t Size) {
     int k=log2(Size)-1;
-    void *ptr=ListHead[k];
-    while(ptr)
+    for(int i=k;i<LIST_NUM;++i)
     {
-        if(BLOCK_SIZE(ptr)>=Size) return ptr;
-        else ptr=NEXT_LIST(ptr);
+        void *ptr=ListHead[i];
+        while(ptr)
+        {
+            if(BLOCK_SIZE(ptr)>=Size) return ptr;
+            else ptr=NEXT_LIST(ptr);
+        }
     }
     return NULL;
 }
