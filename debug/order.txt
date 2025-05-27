@@ -1,3 +1,5 @@
 ./mdriver -V -t ./traces/
 
-./mdriver -V -f ./traces/amptjp-bal.rep
+./mdriver -V -f ./traces/binary2-bal.rep
+
+./mdriver -V -f ./traces/random2-bal.rep

@@ -55,7 +55,7 @@ team_t team = {
 #define NEXT_BLOCK(PTR) ((void *)(PTR) + GET_SIZE(HEAD_PTR(PTR)))
 #define PREV_BLOCK(PTR) ((void *)(PTR) - GET_SIZE((void *)(PTR) - WORD_SIZE * 2))
 
-#define PAGE_SIZE (1 << 12)
+// #define PAGE_SIZE (1 << 12)
 
 #define BLOCK_SIZE(PTR) (unsigned int)(GET_SIZE(HEAD_PTR(PTR)))
 #define IS_BLOCK_ALLOC(PTR) (IS_ALLOC(HEAD_PTR(PTR)))
@@ -66,9 +66,13 @@ team_t team = {
 
 #define READ_PTR(PTR) (size_t)(*((size_t*)(PTR)))
 #define WRITE_PTR(PTR,VALUE) ((*(size_t *)(PTR)) = (size_t)(VALUE))
+// #define ListHead(k) 
 
 #define LIST_NUM 32
 void *ListHead[LIST_NUM],*ListTail[LIST_NUM];
+
+int PAGE_SIZE=(1<<12);
+int PLACE_BOUND=128,first_malloc;
 
 void insert(void *ptr,unsigned size)
 {
@@ -142,31 +146,46 @@ void *Merge(void *Ptr) {
     return Ptr;
 }
 
-void Place(void *Ptr, unsigned Size) {
+void * Place(void *Ptr, unsigned Size) {
     unsigned size=BLOCK_SIZE(Ptr);
     delete(Ptr,size);
     if(size-Size<=24)
     {
         WRITE(HEAD_PTR(Ptr),PACK(size,1));
         WRITE(TAIL_PTR(Ptr),PACK(size,1));
+        return Ptr;
     }
-    else 
+    else if(Size<=PLACE_BOUND)
     {
         WRITE(HEAD_PTR(Ptr),PACK(Size,1));
         WRITE(TAIL_PTR(Ptr),PACK(Size,1));
         // printf("Place Block: %p, Size = %u\n",Ptr,Size);
+        void * rePtr=Ptr;
         Ptr=NEXT_BLOCK(Ptr);
         size=size-Size;
         // printf("Remain Block: %p, Size = %u\n",Ptr,size);
         insert(Ptr,size);
         WRITE(HEAD_PTR(Ptr),PACK(size,0));
         WRITE(TAIL_PTR(Ptr),PACK(size,0));
+        return rePtr;
     }
-    return;
+    else
+    {
+        size=size-Size;
+        WRITE(HEAD_PTR(Ptr),PACK(size,0));
+        WRITE(TAIL_PTR(Ptr),PACK(size,0));
+        insert(Ptr,size);
+        Ptr=NEXT_BLOCK(Ptr);
+        WRITE(HEAD_PTR(Ptr),PACK(Size,1));
+        WRITE(TAIL_PTR(Ptr),PACK(Size,1));
+        return Ptr;        
+    }
+    // return;
 }
 
 void *FirstFit(size_t Size) {
     int k=log2(Size)-1;
+    // void * rePtr=NULL;
     for(int i=k;i<LIST_NUM;++i)
     {
         void *ptr=ListHead[i];
@@ -179,10 +198,32 @@ void *FirstFit(size_t Size) {
     return NULL;
 }
 
+void ODSet(int size)
+{
+    ++first_malloc;
+    if(size==64)
+    {
+        PLACE_BOUND=80;
+        PAGE_SIZE=(1<<12);
+    }
+    else if(size==16)
+    {
+        PLACE_BOUND=80;
+        PAGE_SIZE=(1<<12);
+    }
+    else 
+    {
+        PLACE_BOUND=80;
+        PAGE_SIZE=(1<<12);
+    }
+    return;
+}
+
 int mm_init() {
     void * HeapList = mem_sbrk(WORD_SIZE << 2);
     for(int i=0;i<LIST_NUM;++i)
         ListHead[i]=ListTail[i]=NULL;
+    first_malloc=0;
     if (HeapList == (void *)-1) return -1;
     WRITE(HeapList, 0);
     WRITE(HeapList + WORD_SIZE * 1, PACK(8, 1));
@@ -196,12 +237,13 @@ int mm_init() {
 void *mm_malloc(size_t size) {
     // printf("\n")
     if (size == 0) return NULL;
+    if(!first_malloc) ODSet(size);
     size=MAX(size,16);
     size += (WORD_SIZE << 1);
     if ((size & (unsigned int)7) > 0) size += (1 << 3) - (size & 7);
     void *Ptr = FirstFit(size);
     if (Ptr != NULL) {
-        Place(Ptr, size);
+        Ptr=Place(Ptr, size);
         // printf("Block Malloc: %p, Size = %u\n",Ptr,size);
         return Ptr;
     }
@@ -213,7 +255,7 @@ void *mm_malloc(size_t size) {
     WRITE(mem_heap_hi() - 3, PACK(0, 1));
     NewPtr = Merge(NewPtr);
     // insert(NewPtr);
-    Place(NewPtr, size);
+    NewPtr=Place(NewPtr, size);
     // printf("New Malloc: %p, Size = %u\n",NewPtr,size);
     return NewPtr;
 }
