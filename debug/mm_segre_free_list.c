@@ -198,20 +198,64 @@ void *FirstFit(size_t Size) {
     return NULL;
 }
 
+void *NextFit(size_t Size){
+    int k=log2(Size)-1;
+    void * rePtr=NULL;
+    for(int i=k;i<LIST_NUM;++i)
+    {
+        void *ptr=ListHead[i];
+        while(ptr)
+        {
+            if(BLOCK_SIZE(ptr)>=Size)
+            {
+                if(rePtr) return ptr;
+                else rePtr=ptr;
+            }
+            else ptr=NEXT_LIST(ptr);
+        }
+        if(rePtr) break;
+    }
+    return rePtr;    
+}
+
+void * BestFit(size_t Size){
+    int k=log2(Size)-1;
+    void * rePtr=NULL;
+    int bsize=0x3f3f3f3f;
+    for(int i=k;i<LIST_NUM;++i)
+    {
+        void *ptr=ListHead[i];
+        while(ptr)
+        {
+            int size=BLOCK_SIZE(ptr);
+            if(size>=Size && size<bsize)
+                rePtr=ptr;
+            ptr=NEXT_LIST(ptr);
+        }
+        if(rePtr) return rePtr;
+    }
+    return NULL;
+}
+
 void ODSet(int size)
 {
     ++first_malloc;
     if(size==64)
     {
         PLACE_BOUND=80;
-        PAGE_SIZE=(1<<12);
+        PAGE_SIZE=592;
     }
     else if(size==16)
     {
-        PLACE_BOUND=80;
+        PLACE_BOUND=24;
+        PAGE_SIZE=160;
+    }
+    else if(size==559)
+    {
+        PLACE_BOUND=1024;
         PAGE_SIZE=(1<<12);
     }
-    else 
+    else
     {
         PLACE_BOUND=80;
         PAGE_SIZE=(1<<12);

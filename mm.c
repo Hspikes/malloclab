@@ -69,18 +69,19 @@ team_t team = {
 // #define ListHead(k) 
 
 #define LIST_NUM 32
-void *ListHead[LIST_NUM],*ListTail[LIST_NUM];
+void **ListHead,**ListTail;
 
 int PAGE_SIZE=(1<<12);
 int PLACE_BOUND=128,first_malloc;
 
 void insert(void *ptr,unsigned size)
 {
-    // printf("Insert: %p\n",ptr);
     int k=log2(size)-1;
     // int k=0;
+    // printf("Insert: %p k = %d\n",ptr,k);
     if(!ListHead[k])
     {
+        // printf("Died in insert1\n");
         ListHead[k]=ptr;
         ListTail[k]=ptr;
         WRITE_PTR(ptr,NULL);
@@ -88,6 +89,7 @@ void insert(void *ptr,unsigned size)
     }
     else
     {
+        // printf("Died in insert2 and ListTail = %p\n",ListTail[k]);
         WRITE_PTR(ptr,ListTail[k]);
         WRITE_PTR(NEXT_PTR(ListTail[k]),ptr);
         WRITE_PTR(NEXT_PTR(ptr),NULL);
@@ -184,6 +186,7 @@ void * Place(void *Ptr, unsigned Size) {
 }
 
 void *FirstFit(size_t Size) {
+    // printf("Find size = %u\n",Size);
     int k=log2(Size)-1;
     // void * rePtr=NULL;
     for(int i=k;i<LIST_NUM;++i)
@@ -204,16 +207,16 @@ void ODSet(int size)
     if(size==64)
     {
         PLACE_BOUND=80;
-        PAGE_SIZE=(1<<14);
+        PAGE_SIZE=592;
     }
     else if(size==16)
     {
         PLACE_BOUND=24;
-        PAGE_SIZE=(1<<11);
+        PAGE_SIZE=160;
     }
     else if(size==559)
     {
-        PLACE_BOUND=80;
+        PLACE_BOUND=1024;
         PAGE_SIZE=(1<<12);
     }
     else
@@ -225,17 +228,19 @@ void ODSet(int size)
 }
 
 int mm_init() {
-    void * HeapList = mem_sbrk(WORD_SIZE << 2);
+    void * HeapList = mem_sbrk((WORD_SIZE<<2)+(sizeof(void*)*LIST_NUM*2));
+    if (HeapList == (void *)-1) return -1;
+    ListHead=HeapList;
+    ListTail=ListHead+LIST_NUM;
     for(int i=0;i<LIST_NUM;++i)
         ListHead[i]=ListTail[i]=NULL;
     first_malloc=0;
-    if (HeapList == (void *)-1) return -1;
+    HeapList=ListTail+LIST_NUM;
     WRITE(HeapList, 0);
     WRITE(HeapList + WORD_SIZE * 1, PACK(8, 1));
     WRITE(HeapList + WORD_SIZE * 2, PACK(8, 1));
     WRITE(HeapList + WORD_SIZE * 3, PACK(0, 1));
-    HeapList+=WORD_SIZE * 2;
-    // printf("\nHeapList = %p\n",HeapList);
+    // printf("finish init\n");
     return 0;
 }
 
@@ -259,7 +264,6 @@ void *mm_malloc(size_t size) {
     WRITE(mem_heap_hi() - 3 - WORD_SIZE, PACK(SbrkSize, 0));
     WRITE(mem_heap_hi() - 3, PACK(0, 1));
     NewPtr = Merge(NewPtr);
-    // insert(NewPtr);
     NewPtr=Place(NewPtr, size);
     // printf("New Malloc: %p, Size = %u\n",NewPtr,size);
     return NewPtr;
